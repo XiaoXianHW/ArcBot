@@ -21,6 +21,7 @@ async def parse_ai_message_to_segments(text: str, current_msg_id: Optional[int] 
         如果带有:context参数，会自动保存最近5条对话作为上下文
       - [reminder:时间戳:原因] 或 [reminder:时间戳:原因:context]：创建定时提醒
         如果带有:context参数，会自动保存最近5条对话作为上下文
+      - [poke:QQ号]：群聊中戳一戳某人（仅限群聊）
     其余内容作为text消息段。
     """
     print(f"[Debug] AI Parser: Received raw text: {text}")
@@ -37,6 +38,7 @@ async def parse_ai_message_to_segments(text: str, current_msg_id: Optional[int] 
         r"|(?P<music>\[music:(?P<music_query>[^\]]+)])"
         r"|(?P<note>\[note:(?P<note_content>[^:\]]+)(?::(?P<note_context>context))?\])"
         r"|(?P<reminder>\[reminder:(?P<reminder_time>\d+):(?P<reminder_reason>[^:\]]+)(?::(?P<reminder_context>context))?\])"
+        r"|(?P<poke>\[poke:(?P<poke_qq>\d+)])"
     )
 
     def get_recent_context(chat_id: str, chat_type: str) -> Optional[str]:
@@ -109,6 +111,11 @@ async def parse_ai_message_to_segments(text: str, current_msg_id: Optional[int] 
                     music_indices[task_index] = placeholder_index
                 else:
                     segments_placeholders.append({"type": "text", "data": {"text": "[music:] 标签内容为空"}})
+            elif m.group("poke"):
+                if chat_type != "group":
+                    segments_placeholders.append({"type": "text", "data": {"text": "[poke] 标签仅支持在群聊中使用"}})
+                else:
+                    segments_placeholders.append({"type": "poke", "data": {}})
 
             last_idx = m.end()
 

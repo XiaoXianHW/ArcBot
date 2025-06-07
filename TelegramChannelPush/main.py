@@ -2,24 +2,34 @@ import json
 import base64
 import asyncio
 import socks
+import os
 from datetime import timezone
 import pytz
 import re
 from telethon import TelegramClient, events
 
-from post_extension import load_config, send_msg_to_group
+from post_extension import send_msg_to_group
 from text_formatter import process_markdown_links_and_add_references
+
+def load_config(config_path='config.json'):
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 config = load_config()
 
 api_id = config["api_id"]
 api_hash = config["api_hash"]
-phone_number = config["phone_number"]
+phone_number = config.get("phone_number", "")
 channel_username = config["channel_username"]
 proxy_config = config["proxy"]
 
+# 为 Telethon 创建会话目录
+sessions_dir = 'sessions'
+if not os.path.exists(sessions_dir):
+    os.makedirs(sessions_dir)
+
 client = TelegramClient(
-    f'./sessions/{api_id}',
+    os.path.join(sessions_dir, str(api_id)),
     api_id,
     api_hash,
     proxy={
@@ -55,16 +65,16 @@ async def main():
     @client.on(events.NewMessage(chats=channel))
     async def handler(event):
         msg = event.message
-        # 优先使用 event.message.text_markdown，如果为空，则使用 event.message.message
-        text = msg.text_markdown if msg.text_markdown else (msg.message or "")
-        if config.get("debug"):
-            print(f"收到消息：{msg}")
+        # 优先使用 event.message.text，如果为空，则使用 event.message.message
+        text = msg.text if msg.text else (msg.message or "")
 
-        # 从配置里获取要清理的关键词列表
+        # 立即清理指定的屏蔽词
         removal_strings = config.get("removal_strings", [])
-        # 先对当前消息文本进行清理
         for r in removal_strings:
             text = text.replace(r, "")
+
+        if config.get("debug"):
+            print(f"收到消息：{msg}")
 
         # 如果是相册消息，需要判断是否是该相册最后一条；若不是，则跳过防止重复
         if msg.grouped_id:
@@ -76,10 +86,14 @@ async def main():
             # 取相册内所有消息的文本合并
             group_texts = [m.message for m in grouped_msgs if m.message]
             merged_text = "\n".join(group_texts) if group_texts else ""
-            # 再次清理指定关键词
+            # 再次对合并后的文本进行清理
             for r in removal_strings:
                 merged_text = merged_text.replace(r, "")
             text = merged_text
+        
+        # 清理文本主体和首尾空白
+        text = re.sub(r'(\s*\n){3,}', '\n\n', text) # 移除超过2个的连续换行
+        text = text.strip()
         
         # 处理Markdown链接并生成引用
         processed_text, references_string = process_markdown_links_and_add_references(text)
@@ -87,9 +101,16 @@ async def main():
             text = processed_text + "\n\n" + references_string
         else:
             text = processed_text
-        
-        text = re.sub(r'(\s*\n+\s*\S*\s*\n*\s*)$', '', text)
-        text = text.rstrip()
+
+        # 移除常见的Markdown标记
+        # 移除加粗 (**)
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        # 移除斜体 (__)
+        text = re.sub(r'__(.*?)__', r'\1', text)
+        # 移除删除线 (~~)
+        text = re.sub(r'~~(.*?)~~', r'\1', text)
+        # 移除行内代码 (`)
+        text = re.sub(r'`(.*?)`', r'\1', text)
 
         utc_time = msg.date.replace(tzinfo=timezone.utc)
         china_time = utc_time.astimezone(pytz.timezone("Asia/Shanghai"))
@@ -100,7 +121,7 @@ async def main():
             result = {
                 "text": text,
                 "time": time_str,
-                "images": images
+                "images": [img[:60] + '...' for img in images]
             }
             print(json.dumps(result, ensure_ascii=False, indent=2))
 

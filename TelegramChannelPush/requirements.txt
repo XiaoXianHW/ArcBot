@@ -2,3 +2,4 @@ PySocks
 pytz
 telethon
 requests
+PyJWT

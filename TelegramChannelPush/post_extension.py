@@ -1,13 +1,18 @@
 import json
 import random
 import time
+from pathlib import Path
 from typing import List, Sequence, Union
 
 import requests
 
+# 路径自适应
+SCRIPT_DIR = Path(__file__).parent.resolve()
+
 # ────────────────── 读取配置 ──────────────────
 def load_config(path: str = "config.json"):
-    with open(path, "r", encoding="utf-8") as f:
+    config_path = SCRIPT_DIR / path
+    with open(config_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 config = load_config()
@@ -25,7 +30,7 @@ def _normalize_text(text: Union[str, Sequence[str]]) -> str:
 
 
 # ────────────────── 主发送函数 ──────────────────
-def send_msg_to_group(text, time_str: str, base64_list: List[str]):
+def send_msg_to_group(text, time_str: str, base64_list: List[str], source_channel: str):
     """
     将整理后的 Telegram 内容推送到 NapCat（QQ 机器人）。
     text 可以是 str，或 (正文, 引用) 的 tuple/list。
@@ -49,7 +54,7 @@ def send_msg_to_group(text, time_str: str, base64_list: List[str]):
             "text": (
                 f"{text}\n"
                 f"发布时间: {time_str}\n"
-                f"信息来源: @{config.get('channel_username', '')}\n"
+                f"信息来源: @{source_channel}\n"
                 f"Repost By ArcBot"
             )
         },
@@ -65,7 +70,8 @@ def send_msg_to_group(text, time_str: str, base64_list: List[str]):
     for gid in post_group_ids:
         body = {"group_id": gid, "message": message_list}
         try:
-            r = requests.post(post_url, headers=headers, data=json.dumps(body, ensure_ascii=False))
+            r = requests.post(post_url, headers=headers, json=body)
+            r.raise_for_status()
             print(f"已向群 {gid} 发送，状态 {r.status_code}，返回 {r.text}")
             time.sleep(random.uniform(1.0, 3.0))  # 简单限速
         except Exception as exc:

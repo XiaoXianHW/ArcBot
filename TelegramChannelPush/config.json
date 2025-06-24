@@ -1,8 +1,11 @@
 {
-  "api_id": "",
-  "api_hash": "",
-  "phone_number": "+",
-  "channel_username": "",
+  "api_id": "your_api_id",
+  "api_hash": "your_api_hash",
+  "phone_number": "your_phone_number_with_country_code",
+  "channel_usernames": [
+    "zaihuapd",
+    "xhqcankao"
+  ],
   "debug": false,
   "proxy": {
     "proxy_type": "socks5",
@@ -10,14 +13,39 @@
     "port": 7890,
     "rdns": true
   },
-  "napcat_url": "http://ip:port/send_group_msg",
-  "napcat_token": "",
+  "napcat_url": "http://your_ip:your_port/send_group_msg",
+  "napcat_token": "your_napcat_token",
   "napcat_group_ids": [
     "10001"
   ],
   "removal_strings": [
     "投稿",
     "频道"
-  ]
+  ],
+  "llm_configs": {
+    "deepseek_filter_model": {
+      "provider": "openai",
+      "api_base": "https://api.deepseek.com/v1",
+      "api_key": "your_deepseek_api_key",
+      "model": "deepseek-chat"
+    },
+    "glm_analysis_model": {
+      "provider": "zhipuai",
+      "api_base": "https://open.bigmodel.cn/api/paas/v4",
+      "api_key": "your_zhipu_api_key",
+      "model": "glm-4-flash"
+    }
+  },
+  "task_model_mapping": {
+    "analysis_and_refinement": "deepseek_filter_model",
+    "filtering": "deepseek_filter_model",
+    "summarization": "glm_analysis_model"
+  },
+  "llm_filter": {
+    "enabled": true,
+    "base_prompt": "你是一位专业的科技新闻编辑，负责筛选高质量、信息密度大的前沿技术新闻进行转发。你的核心任务是识别并转发与以下领域高度相关的、具有深度价值的硬核技术新闻：[\"人工智能\", \"半导体技术\", \"自动驾驶\", \"太空科技\"]。对于不在此列表但同样具有高技术价值的新闻，也应考虑转发。你需要参考最近已转发的新闻摘要，如果新消息与它们内容高度相似或重复，则判定为重复，不予转发。",
+    "user_like_prompt": "",
+    "user_dislike_prompt": "我不喜欢关于开源技术的新闻。",
+    "deduplication_window_hours": 24
+  }
 }
-  
